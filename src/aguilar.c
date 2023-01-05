@@ -156,7 +156,6 @@ static int Aguilar_RunBuildInstruction(arena_t *arena, char* source, char* args,
 {
     const char* compiler = Aguilar_GetCompilerEnv();
 
-    // NOTE(Alex): Assume GCC is preferred for now.
     size_t command_length = strlen(source) + strlen(compiler) + strlen(ARG_OUTPUT);
 
     // NOTE(Alex): Run with default options.
@@ -221,7 +220,6 @@ static int Aguilar_Build(arena_t *arena)
 
     while ((entry = readdir(src_dir)) != NULL and !entry_found)
     {
-        /* path = realloc(path, sizeof(char) * (strlen("src/") + sizeof(entry->d_name))); */
         path = AWN_ArenaResize(arena, path, (arena->pos - arena->pos_prev), sizeof(char) * (strlen("src/") + sizeof(entry->d_name)));
 
         sprintf(path, "src/%s", entry->d_name);
