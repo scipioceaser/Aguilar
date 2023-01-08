@@ -27,11 +27,21 @@
 #include <sys/stat.h>
 #include <dirent.h>
 
-static bool Aguilar_FileExists(const char* file)
+static bool Aguilar_FileExists(const char* file, struct stat *sb)
 {
-    struct stat sb;
+    struct stat *ptr;
+    struct stat tmp;
 
-    if (stat(file, &sb) == -1)
+    if (sb == 0)
+    {
+        ptr = &tmp;
+    }
+    else
+    {
+        ptr = sb;
+    }
+
+    if (stat(file, ptr) == -1)
     {
         return false;
     }
@@ -55,16 +65,13 @@ static char* Aguilar_GetError()
     return __error;
 }
 
+#define ENV_COMPILER "AGUILAR_COMPILER"
+
 static char* Aguilar_GetCompilerEnv()
 {
-    if (getenv("AGUILAR_COMPILER") == NULL)
+    if (getenv(ENV_COMPILER) != NULL)
     {
-        setenv("AGUILAR_COMPILER", "gcc", 1);
-        return "gcc";
-    }
-    else 
-    {
-        const char* env = getenv("AGUILAR_COMPILER");
+        const char* env = getenv(ENV_COMPILER);
         
         if (strcmp(env, "GCC") == 0 or strcmp(env, "gcc") == 0)
         {
@@ -77,12 +84,12 @@ static char* Aguilar_GetCompilerEnv()
         }
     }
 
-    return "";
+    return "gcc";
 }
 
 static int Aguilar_NewProject(arena_t *arena, char* name)
 {
-    if (Aguilar_FileExists(name))
+    if (Aguilar_FileExists(name, 0))
     {
         Aguilar_SetError("Directory already exists!");
         return -1;
@@ -154,7 +161,7 @@ static int Aguilar_GetFileDelim(char* string)
 
 static int Aguilar_RunBuildInstruction(arena_t *arena, char* source, char* args, char* output)
 {
-    const char* compiler = Aguilar_GetCompilerEnv();
+    const char* compiler = Aguilar_GetCompilerEnv(arena);
 
     size_t command_length = strlen(source) + strlen(compiler) + strlen(ARG_OUTPUT);
 
@@ -186,19 +193,19 @@ static int Aguilar_RunBuildInstruction(arena_t *arena, char* source, char* args,
 
 static int Aguilar_Build(arena_t *arena)
 {
-    if (Aguilar_FileExists("build.sh"))
+    if (Aguilar_FileExists("build.sh", 0))
     {
         system("./build.sh");
         return 1;
     }
 
-    if (Aguilar_FileExists("Makefile"))
+    if (Aguilar_FileExists("Makefile", 0))
     {
         system("make");
         return 1;
     }
 
-    if (!Aguilar_FileExists("src"))
+    if (!Aguilar_FileExists("src", 0))
     {
         Aguilar_SetError("No src directory found, cannot run!");
         return -1;
@@ -270,21 +277,131 @@ static int Aguilar_Build(arena_t *arena)
 }
 
 #define CACHE_OUT_PATH "~/.cache/aguilar_program.out"
+#define CACHE_CONFIG_PATH "/.cache/aguilar_program.cache"
+
+static char* Aguilar_FormatCacheSettingsPath(arena_t *arena)
+{
+    const char* home = getenv("HOME");
+    if (home == NULL)
+    {
+        Aguilar_SetError("Failed to get home directory!");
+        return NULL;
+    }
+
+    char* config_path = AWN_ArenaPush(arena, sizeof(char) * (strlen(CACHE_CONFIG_PATH) + strlen(home)));
+    sprintf(config_path, "%s%s", home, CACHE_CONFIG_PATH);
+
+    return config_path;
+}
+
+static int Aguilar_WriteCacheSettings(arena_t *arena, const char* file, u64 mod_time)
+{
+    const char* config_path = Aguilar_FormatCacheSettingsPath(arena);
+    if (config_path == NULL)
+    {
+        return -1;
+    }
+
+    FILE* settings_file = fopen(config_path, "w+");
+    if (settings_file == NULL)
+    {
+        Aguilar_SetError("Failed to write cache settings file!");
+        return -1;
+    }
+
+    fwrite(file, sizeof(char), strlen(file), settings_file);
+    fwrite("\n", sizeof(char), 1, settings_file);
+
+    char* mod_str = AWN_ArenaPush(arena, sizeof(char) * 512);
+
+    snprintf(mod_str, sizeof(char) * 512, "%lu", mod_time);
+
+    fwrite(mod_str, sizeof(char), strlen(mod_str), settings_file);
+
+    fclose(settings_file);
+
+    return 0;
+}
+
+static int Aguilar_ReadCacheSettings(arena_t *arena, char** file, u64* mod_time, size_t string_max)
+{
+    const char* config_path = Aguilar_FormatCacheSettingsPath(arena);
+    if (config_path == NULL)
+    {
+        *file = "";
+        *mod_time = 0;
+        return -1;
+    }
+
+    FILE* settings_file = fopen(config_path, "r");
+    if (settings_file == NULL)
+    {
+        *file = "";
+        *mod_time = 0;
+        return 0;
+    }
+
+    if (*file == 0)
+    {
+        *file = AWN_ArenaPush(arena, sizeof(char) * string_max);
+    }
+
+    // TODO(Alex): At the moment we are assuming that the settings file 
+    //              has been written in a specific order defined 
+    //              in the write function.
+    char line[string_max];
+    fgets(line, string_max, settings_file);
+
+    if (line[strlen(line) - 1] == '\n')
+    {
+        strncpy(*file, line, strlen(line) - 1);
+    }
+    else
+    {
+        strncpy(*file, line, strlen(line));
+    }
+
+    fgets(line, string_max, settings_file);
+
+    *mod_time = strtoul(line, 0, 0);
+
+    return 0;
+}
 
 static int Aguilar_Run(arena_t *arena, char* file, char* arg)
 {
-    if (!Aguilar_FileExists(file))
+    struct stat sb;
+    if (!Aguilar_FileExists(file, &sb))
     {
         Aguilar_SetError("File does not exist!");
         return -1;
     }
 
-    int ret = Aguilar_RunBuildInstruction(arena, file, arg, CACHE_OUT_PATH);
-
-    if (ret != 0)
+    char* f = AWN_ArenaPush(arena, sizeof(char) * 1024);
+    u64 m = 0;
+    if (Aguilar_ReadCacheSettings(arena, &f, &m, 1024) != 0)
     {
-        Aguilar_SetError("Compiler encountered an error!");
         return -1;
+    }
+
+    if (strcmp(f, file) != 0 or m != sb.st_mtime)
+    {
+        int ret = Aguilar_RunBuildInstruction(arena, file, arg, CACHE_OUT_PATH);
+
+        if (ret != 0)
+        {
+            Aguilar_SetError("Compiler encountered an error!");
+            return -1;
+        }
+
+        if (Aguilar_WriteCacheSettings(arena, file, sb.st_mtime) != 0)
+        {
+            return -1;
+        }
+    }
+    else
+    {
+        printf("No changes, not recompiling!\n");
     }
 
     system(CACHE_OUT_PATH);
@@ -342,9 +459,8 @@ static int Aguilar_Install(arena_t *arena)
 
     sprintf(path, "%s/.local/bin/Aguilar_data/", home_dir);
 
-    /* const char* data_dir = "~/.local/bin/Aguilar_data/"; */
     const char* fname = "main.c";
-    if (!Aguilar_FileExists(path))
+    if (!Aguilar_FileExists(path, 0))
     {
         if (mkdir(path, S_IRWXG | S_IRWXO | S_IRWXU) != 0)
         {
