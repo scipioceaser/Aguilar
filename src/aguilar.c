@@ -27,6 +27,8 @@
 #include <sys/stat.h>
 #include <dirent.h>
 
+#define AGUILAR_VERSION "0.1"
+
 static bool Aguilar_FileExists(const char* file, struct stat *sb)
 {
     struct stat *ptr;
@@ -146,22 +148,9 @@ static int Aguilar_NewProject(arena_t *arena, char* name)
 #define CALL_CLANG "clang"
 #define ARG_OUTPUT "-o"
 
-static int Aguilar_GetFileDelim(char* string)
-{
-    for (int i = 0; i < strlen(string); i++)
-    {
-        if (string[i] == '.')
-        {
-            return i;
-        }
-    }
-
-    return strlen(string);
-}
-
 static int Aguilar_RunBuildInstruction(arena_t *arena, char* source, char* args, char* output)
 {
-    const char* compiler = Aguilar_GetCompilerEnv(arena);
+    const char* compiler = Aguilar_GetCompilerEnv();
 
     size_t command_length = strlen(source) + strlen(compiler) + strlen(ARG_OUTPUT);
 
@@ -253,7 +242,7 @@ static int Aguilar_Build(arena_t *arena)
     char cwd[128];
     getcwd(cwd, 128);
 
-    int offset;
+    int offset = 0;
     for (int i = 0; i < strlen(cwd); i++)
     {
         if (cwd[i] == '/')
@@ -341,9 +330,11 @@ static int Aguilar_ReadCacheSettings(arena_t *arena, char** file, u64* mod_time,
         return 0;
     }
 
+    const int file_buffer_size = sizeof(char) * string_max;
+
     if (*file == 0)
     {
-        *file = AWN_ArenaPush(arena, sizeof(char) * string_max);
+        *file = AWN_ArenaPush(arena, file_buffer_size);
     }
 
     // TODO(Alex): At the moment we are assuming that the settings file 
@@ -354,11 +345,12 @@ static int Aguilar_ReadCacheSettings(arena_t *arena, char** file, u64* mod_time,
 
     if (line[strlen(line) - 1] == '\n')
     {
-        strncpy(*file, line, strlen(line) - 1);
+        line[strlen(line) - 1] = '\0';
+        strncpy(*file, line, file_buffer_size - strlen(*file) - 1);
     }
     else
     {
-        strncpy(*file, line, strlen(line));
+        strncpy(*file, line, file_buffer_size - strlen(*file) - 1);
     }
 
     fgets(line, string_max, settings_file);
@@ -383,6 +375,7 @@ static int Aguilar_Run(arena_t *arena, char* file, char* arg)
     {
         return -1;
     }
+    printf("%s\n", f);
 
     if (strcmp(f, file) != 0 or m != sb.st_mtime)
     {
@@ -469,7 +462,7 @@ static int Aguilar_Install(arena_t *arena)
         }
     }
 
-    strncat(path, fname, strlen(fname));
+    strncat(path, fname, strlen(fname) + 1);
 
     if (Aguilar_WriteBasicMainFile(path) == -1)
     {
@@ -485,6 +478,8 @@ static void Aguilar_Help()
 {
     printf("Aguilar is a single command-line application that makes using C as a scripting language a lot easier.\n");
     printf("Aguilar is not itself a C compiler, and instead calls either the GNU or LLVM compilers.\n");
+    printf("\n");
+    printf("Version: %s\n", AGUILAR_VERSION);
     printf("\n");
     printf("Commands:\n");
     printf("\n");
@@ -517,12 +512,13 @@ static char* Aguilar_MergeArgs(arena_t *arena, char** args, int merge_offset, in
         return 0;
     }
 
-    char* merge = AWN_ArenaPush(arena, sizeof(char) * merge_size);
+    const int dest_size = sizeof(char) * merge_size;
+    char* merge = AWN_ArenaPush(arena, dest_size);
 
     for (int i = merge_offset; i < merge_num; i++)
     {
-        strncat(merge, args[i], strlen(args[i]));
-        strncat(merge, " ", 1);
+        strncat(merge, args[i], dest_size - strlen(merge) - 1);
+        strncat(merge, " ", 2);
     }
 
     return merge;
@@ -581,8 +577,8 @@ int main(int argc, char** argv)
                 printf("Failed to install: %s\n", Aguilar_GetError());
             }
         } break;
-        case 'h': Aguilar_Help(); break;
         case 'z': Aguilar_Zen(); break;
+        default: case 'h': Aguilar_Help();
     }
 
     free(arena.buffer);
