@@ -11,7 +11,8 @@
         - zen: Print a zen of code.
 */
 
-// TODO(Alex): Code documentation for the future.
+// TODO(Alex): Sync function to update when changes are made to template.
+// TODO(Alex): Code documentation.
 // TODO(Alex): Structs for function arguments + cleaner handling of command line arguments.
 
 // WARNING(Alex): This only works on Linux (Maybe MacOS?).
@@ -34,17 +35,13 @@ static bool Aguilar_FileExists(const char* file, struct stat *sb)
     struct stat *ptr;
     struct stat tmp;
 
-    if (sb == 0)
-    {
+    if (sb == 0) {
         ptr = &tmp;
-    }
-    else
-    {
+    } else {
         ptr = sb;
     }
 
-    if (stat(file, ptr) == -1)
-    {
+    if (stat(file, ptr) == -1) {
         return false;
     }
 
@@ -56,8 +53,7 @@ char __error[ERROR_STR_LEN] = { 0 };
 
 static void Aguilar_SetError(char* error)
 {
-    if (strlen(error) < ERROR_STR_LEN)
-    {
+    if (strlen(error) < ERROR_STR_LEN) {
         memcpy(__error, error, strlen(error));
     }
 }
@@ -71,17 +67,14 @@ static char* Aguilar_GetError()
 
 static char* Aguilar_GetCompilerEnv()
 {
-    if (getenv(ENV_COMPILER) != NULL)
-    {
+    if (getenv(ENV_COMPILER) != NULL) {
         const char* env = getenv(ENV_COMPILER);
         
-        if (strcmp(env, "GCC") == 0 or strcmp(env, "gcc") == 0)
-        {
+        if (strcmp(env, "GCC") == 0 or strcmp(env, "gcc") == 0) {
             return "gcc";
         }
 
-        if (strcmp(env, "CLANG") == 0 or strcmp(env, "clang") == 0)
-        {
+        if (strcmp(env, "CLANG") == 0 or strcmp(env, "clang") == 0) {
             return "clang";
         }
     }
@@ -91,14 +84,12 @@ static char* Aguilar_GetCompilerEnv()
 
 static int Aguilar_NewProject(arena_t *arena, char* name)
 {
-    if (Aguilar_FileExists(name, 0))
-    {
+    if (Aguilar_FileExists(name, 0)) {
         Aguilar_SetError("Directory already exists!");
         return -1;
     }
 
-    if (mkdir(name, S_IRWXG | S_IRWXO | S_IRWXU) != 0)
-    {
+    if (mkdir(name, S_IRWXG | S_IRWXO | S_IRWXU) != 0) {
         Aguilar_SetError("System failed to create new directory!");
         return -1;
     }
@@ -110,8 +101,7 @@ static int Aguilar_NewProject(arena_t *arena, char* name)
     int success = mkdir(src_path, S_IRWXG | S_IRWXO | S_IRWXU);
 
     // TODO(Alex): Delete parent directory on failure.
-    if (success != 0)
-    {
+    if (success != 0) {
         Aguilar_SetError("System failed to create new directory!");
         return -1;
     }
@@ -126,8 +116,7 @@ static int Aguilar_NewProject(arena_t *arena, char* name)
 
     success = system(command);
     
-    if (success != 0)
-    {
+    if (success != 0) {
         Aguilar_SetError("System command failed!");
         return -1;
     }
@@ -135,8 +124,7 @@ static int Aguilar_NewProject(arena_t *arena, char* name)
     sprintf(command, "rsync -a ~/.local/bin/Aguilar_data/ %s/src/ --exclude=main.c", name);
     success = system(command);
 
-    if (success != 0)
-    {
+    if (success != 0) {
         Aguilar_SetError("System command failed!");
         return -1;
     }
@@ -155,8 +143,7 @@ static int Aguilar_RunBuildInstruction(arena_t *arena, char* source, char* args,
     size_t command_length = strlen(source) + strlen(compiler) + strlen(ARG_OUTPUT);
 
     // NOTE(Alex): Run with default options.
-    if (args == 0)
-    {
+    if (args == 0) {
         args = "-Wall -g -O3";
     }
 
@@ -164,8 +151,7 @@ static int Aguilar_RunBuildInstruction(arena_t *arena, char* source, char* args,
 
     const char* output_file = "app.out";
 
-    if (output != 0)
-    {
+    if (output != 0) {
         output_file = output;
     }
 
@@ -182,28 +168,24 @@ static int Aguilar_RunBuildInstruction(arena_t *arena, char* source, char* args,
 
 static int Aguilar_Build(arena_t *arena)
 {
-    if (Aguilar_FileExists("build.sh", 0))
-    {
+    if (Aguilar_FileExists("build.sh", 0)) {
         system("./build.sh");
         return 1;
     }
 
-    if (Aguilar_FileExists("Makefile", 0))
-    {
+    if (Aguilar_FileExists("Makefile", 0)) {
         system("make");
         return 1;
     }
 
-    if (!Aguilar_FileExists("src", 0))
-    {
+    if (!Aguilar_FileExists("src", 0)) {
         Aguilar_SetError("No src directory found, cannot run!");
         return -1;
     }
 
     DIR *src_dir = opendir("src");
 
-    if (src_dir == NULL)
-    {
+    if (src_dir == NULL) {
         Aguilar_SetError("Could not open the source directory!");
         return -1;
     }
@@ -214,23 +196,19 @@ static int Aguilar_Build(arena_t *arena)
 
     bool entry_found = false;
 
-    while ((entry = readdir(src_dir)) != NULL and !entry_found)
-    {
+    while ((entry = readdir(src_dir)) != NULL and !entry_found) {
         path = AWN_ArenaResize(arena, path, (arena->pos - arena->pos_prev), sizeof(char) * (strlen("src/") + sizeof(entry->d_name)));
 
         sprintf(path, "src/%s", entry->d_name);
 
         FILE *file = fopen(path, "r");
 
-        if (file != NULL)
-        {
+        if (file != NULL) {
             char buff[1024];
 
             // TODO(Alex): There has to be a better way to do this.
-            while (fgets(buff, sizeof(buff), file) != NULL)
-            {
-                if (strncmp(buff, "int main(", 9) == 0)
-                {
+            while (fgets(buff, sizeof(buff), file) != NULL) {
+                if (strncmp(buff, "int main(", 9) == 0) {
                     entry_found = true;
                 }
             }
@@ -243,10 +221,8 @@ static int Aguilar_Build(arena_t *arena)
     getcwd(cwd, 128);
 
     int offset = 0;
-    for (int i = 0; i < strlen(cwd); i++)
-    {
-        if (cwd[i] == '/')
-        {
+    for (int i = 0; i < strlen(cwd); i++) {
+        if (cwd[i] == '/') {
             offset = i + 1;
         }
     }
@@ -271,8 +247,7 @@ static int Aguilar_Build(arena_t *arena)
 static char* Aguilar_FormatCacheSettingsPath(arena_t *arena)
 {
     const char* home = getenv("HOME");
-    if (home == NULL)
-    {
+    if (home == NULL) {
         Aguilar_SetError("Failed to get home directory!");
         return NULL;
     }
@@ -286,14 +261,12 @@ static char* Aguilar_FormatCacheSettingsPath(arena_t *arena)
 static int Aguilar_WriteCacheSettings(arena_t *arena, const char* file, u64 mod_time)
 {
     const char* config_path = Aguilar_FormatCacheSettingsPath(arena);
-    if (config_path == NULL)
-    {
+    if (config_path == NULL) {
         return -1;
     }
 
     FILE* settings_file = fopen(config_path, "w+");
-    if (settings_file == NULL)
-    {
+    if (settings_file == NULL) {
         Aguilar_SetError("Failed to write cache settings file!");
         return -1;
     }
@@ -315,16 +288,14 @@ static int Aguilar_WriteCacheSettings(arena_t *arena, const char* file, u64 mod_
 static int Aguilar_ReadCacheSettings(arena_t *arena, char** file, u64* mod_time, size_t string_max)
 {
     const char* config_path = Aguilar_FormatCacheSettingsPath(arena);
-    if (config_path == NULL)
-    {
+    if (config_path == NULL) {
         *file = "";
         *mod_time = 0;
         return -1;
     }
 
     FILE* settings_file = fopen(config_path, "r");
-    if (settings_file == NULL)
-    {
+    if (settings_file == NULL) {
         *file = "";
         *mod_time = 0;
         return 0;
@@ -332,8 +303,7 @@ static int Aguilar_ReadCacheSettings(arena_t *arena, char** file, u64* mod_time,
 
     const int file_buffer_size = sizeof(char) * string_max;
 
-    if (*file == 0)
-    {
+    if (*file == 0) {
         *file = AWN_ArenaPush(arena, file_buffer_size);
     }
 
@@ -343,13 +313,10 @@ static int Aguilar_ReadCacheSettings(arena_t *arena, char** file, u64* mod_time,
     char line[string_max];
     fgets(line, string_max, settings_file);
 
-    if (line[strlen(line) - 1] == '\n')
-    {
+    if (line[strlen(line) - 1] == '\n') {
         line[strlen(line) - 1] = '\0';
         strncpy(*file, line, file_buffer_size - strlen(*file) - 1);
-    }
-    else
-    {
+    } else {
         strncpy(*file, line, file_buffer_size - strlen(*file) - 1);
     }
 
@@ -363,37 +330,29 @@ static int Aguilar_ReadCacheSettings(arena_t *arena, char** file, u64* mod_time,
 static int Aguilar_Run(arena_t *arena, char* file, char* arg)
 {
     struct stat sb;
-    if (!Aguilar_FileExists(file, &sb))
-    {
+    if (!Aguilar_FileExists(file, &sb)) {
         Aguilar_SetError("File does not exist!");
         return -1;
     }
 
     char* f = AWN_ArenaPush(arena, sizeof(char) * 1024);
     u64 m = 0;
-    if (Aguilar_ReadCacheSettings(arena, &f, &m, 1024) != 0)
-    {
+    if (Aguilar_ReadCacheSettings(arena, &f, &m, 1024) != 0) {
         return -1;
     }
-    printf("%s\n", f);
 
-    if (strcmp(f, file) != 0 or m != sb.st_mtime)
-    {
+    if (strcmp(f, file) != 0 or m != sb.st_mtime) {
         int ret = Aguilar_RunBuildInstruction(arena, file, arg, CACHE_OUT_PATH);
 
-        if (ret != 0)
-        {
+        if (ret != 0) {
             Aguilar_SetError("Compiler encountered an error!");
             return -1;
         }
 
-        if (Aguilar_WriteCacheSettings(arena, file, sb.st_mtime) != 0)
-        {
+        if (Aguilar_WriteCacheSettings(arena, file, sb.st_mtime) != 0) {
             return -1;
         }
-    }
-    else
-    {
+    } else {
         printf("No changes, not recompiling!\n");
     }
 
@@ -408,8 +367,7 @@ static int Aguilar_WriteBasicMainFile(const char* path)
 {
     FILE *file = fopen(path, "w");
 
-    if (file == NULL)
-    {
+    if (file == NULL) {
         printf("At: %s, ", path);
         Aguilar_SetError("System failed to create new file!");
         return -1;
@@ -434,16 +392,14 @@ static int Aguilar_Install(arena_t *arena)
 
     int success = system(command);
 
-    if (success != 0)
-    {
+    if (success != 0) {
         Aguilar_SetError("Failed to run system call!");
         return -1;
     }
 
     const char* home_dir = getenv("HOME");   
     
-    if (home_dir == NULL)
-    {
+    if (home_dir == NULL) {
         Aguilar_SetError("Failed to get home directory!");
         return -1;
     }
@@ -453,10 +409,8 @@ static int Aguilar_Install(arena_t *arena)
     sprintf(path, "%s/.local/bin/Aguilar_data/", home_dir);
 
     const char* fname = "main.c";
-    if (!Aguilar_FileExists(path, 0))
-    {
-        if (mkdir(path, S_IRWXG | S_IRWXO | S_IRWXU) != 0)
-        {
+    if (!Aguilar_FileExists(path, 0)) {
+        if (mkdir(path, S_IRWXG | S_IRWXO | S_IRWXU) != 0) {
             Aguilar_SetError("System failed to create new directory!");
             return -1;
         }
@@ -464,8 +418,7 @@ static int Aguilar_Install(arena_t *arena)
 
     strncat(path, fname, strlen(fname) + 1);
 
-    if (Aguilar_WriteBasicMainFile(path) == -1)
-    {
+    if (Aguilar_WriteBasicMainFile(path) == -1) {
         return -1;
     }
 
@@ -502,21 +455,18 @@ static char* Aguilar_MergeArgs(arena_t *arena, char** args, int merge_offset, in
 {
     size_t merge_size = 0;
 
-    for (int i = merge_offset; i < merge_num; i++)
-    {
+    for (int i = merge_offset; i < merge_num; i++) {
         merge_size += strlen(args[i]) + 1;
     }
 
-    if (merge_size == 0)
-    {
+    if (merge_size == 0) {
         return 0;
     }
 
     const int dest_size = sizeof(char) * merge_size;
     char* merge = AWN_ArenaPush(arena, dest_size);
 
-    for (int i = merge_offset; i < merge_num; i++)
-    {
+    for (int i = merge_offset; i < merge_num; i++) {
         strncat(merge, args[i], dest_size - strlen(merge) - 1);
         strncat(merge, " ", 2);
     }
@@ -526,8 +476,7 @@ static char* Aguilar_MergeArgs(arena_t *arena, char** args, int merge_offset, in
 
 int main(int argc, char** argv)
 {
-    if (argc < 2 or strlen(argv[1]) < 1) 
-    {
+    if (argc < 2 or strlen(argv[1]) < 1) {
         Aguilar_Help();
         return 0;
     }
@@ -537,43 +486,31 @@ int main(int argc, char** argv)
 
     switch (argv[1][0])
     {
-        case 'n': 
-        {
-            if (argc > 2 and strlen(argv[2]) > 0)
-            {
-                if (Aguilar_NewProject(&arena, argv[2]) < 0)
-                {
+        case 'n': {
+            if (argc > 2 and strlen(argv[2]) > 0) {
+                if (Aguilar_NewProject(&arena, argv[2]) < 0) {
                     printf("Failed to create new project: %s\n", Aguilar_GetError());
                 }
             }
         } break;
-        case 'b': 
-        {
-            if (Aguilar_Build(&arena) < 0)
-            {
+        case 'b': {
+            if (Aguilar_Build(&arena) < 0) {
                 printf("Failed to build: %s\n", Aguilar_GetError());
             }
         } break;
-        case 'r':
-        {
-            if (argc > 2 and strlen(argv[2]) > 0)
-            {
+        case 'r': {
+            if (argc > 2 and strlen(argv[2]) > 0) {
                 char* arg = Aguilar_MergeArgs(&arena, argv, 3, argc);
 
-                if (Aguilar_Run(&arena, argv[2], arg) < 0)
-                {
+                if (Aguilar_Run(&arena, argv[2], arg) < 0) {
                     printf("Failed to run: %s\n", Aguilar_GetError());
                 }
-            }
-            else 
-            {
+            } else {
                 printf("Need to specify file to run!\n");
             }
         } break;
-        case 'i': 
-        { 
-            if (Aguilar_Install(&arena) < 0)
-            {
+        case 'i': { 
+            if (Aguilar_Install(&arena) < 0) {
                 printf("Failed to install: %s\n", Aguilar_GetError());
             }
         } break;
