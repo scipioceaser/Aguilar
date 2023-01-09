@@ -5,13 +5,14 @@
     Commands:
         - new [name]: Create a new project based on a predefined template.
         - build (file): Build either a file or a project based on whether it can find a config file.
+        - sync: Update an existing repository with any changes made to template files.   
         - run [file]: Build a single file (application is stored in a cache) and run it.
         - install: Install the application in the user's bin folder.
         - help: Print everything you need to know.
         - zen: Print a zen of code.
 */
 
-// TODO(Alex): Sync function to update when changes are made to template.
+// TODO(Alex): Define standard paths inside platform-specific macros.
 // TODO(Alex): Code documentation.
 // TODO(Alex): Structs for function arguments + cleaner handling of command line arguments.
 
@@ -30,7 +31,7 @@
 
 #define AGUILAR_VERSION "0.1"
 
-static bool Aguilar_FileExists(const char* file, struct stat *sb)
+internal bool Aguilar_FileExists(const char* file, struct stat *sb)
 {
     struct stat *ptr;
     struct stat tmp;
@@ -51,21 +52,21 @@ static bool Aguilar_FileExists(const char* file, struct stat *sb)
 #define ERROR_STR_LEN 1024
 char __error[ERROR_STR_LEN] = { 0 };
 
-static void Aguilar_SetError(char* error)
+internal void Aguilar_SetError(char* error)
 {
     if (strlen(error) < ERROR_STR_LEN) {
         memcpy(__error, error, strlen(error));
     }
 }
 
-static char* Aguilar_GetError()
+internal char* Aguilar_GetError()
 {
     return __error;
 }
 
 #define ENV_COMPILER "AGUILAR_COMPILER"
 
-static char* Aguilar_GetCompilerEnv()
+internal char* Aguilar_GetCompilerEnv()
 {
     if (getenv(ENV_COMPILER) != NULL) {
         const char* env = getenv(ENV_COMPILER);
@@ -82,7 +83,7 @@ static char* Aguilar_GetCompilerEnv()
     return "gcc";
 }
 
-static int Aguilar_NewProject(arena_t *arena, char* name)
+internal int Aguilar_NewProject(arena_t *arena, char* name)
 {
     if (Aguilar_FileExists(name, 0)) {
         Aguilar_SetError("Directory already exists!");
@@ -132,11 +133,28 @@ static int Aguilar_NewProject(arena_t *arena, char* name)
     return 1;
 }
 
+internal int Aguilar_SyncProject(arena_t* arena)
+{
+    if (!Aguilar_FileExists("src", 0)) {
+        Aguilar_SetError("Not inside project directory!");
+        return -1;
+    }
+
+    int success = system("rsync -a ~/.local/bin/Aguilar_data/ src/ --exclude=main.c");
+
+    if (success != 0) {
+        Aguilar_SetError("Command failed!");
+        return -1;
+    }
+
+    return 0;
+}
+
 #define CALL_GCC "gcc"
 #define CALL_CLANG "clang"
 #define ARG_OUTPUT "-o"
 
-static int Aguilar_RunBuildInstruction(arena_t *arena, char* source, char* args, char* output)
+internal int Aguilar_RunBuildInstruction(arena_t *arena, char* source, char* args, char* output)
 {
     const char* compiler = Aguilar_GetCompilerEnv();
 
@@ -166,7 +184,7 @@ static int Aguilar_RunBuildInstruction(arena_t *arena, char* source, char* args,
     return res;
 }
 
-static int Aguilar_Build(arena_t *arena)
+internal int Aguilar_Build(arena_t *arena)
 {
     if (Aguilar_FileExists("build.sh", 0)) {
         system("./build.sh");
@@ -244,7 +262,7 @@ static int Aguilar_Build(arena_t *arena)
 #define CACHE_OUT_PATH "~/.cache/aguilar_program.out"
 #define CACHE_CONFIG_PATH "/.cache/aguilar_program.cache"
 
-static char* Aguilar_FormatCacheSettingsPath(arena_t *arena)
+internal char* Aguilar_FormatCacheSettingsPath(arena_t *arena)
 {
     const char* home = getenv("HOME");
     if (home == NULL) {
@@ -258,7 +276,7 @@ static char* Aguilar_FormatCacheSettingsPath(arena_t *arena)
     return config_path;
 }
 
-static int Aguilar_WriteCacheSettings(arena_t *arena, const char* file, u64 mod_time)
+internal int Aguilar_WriteCacheSettings(arena_t *arena, const char* file, u64 mod_time)
 {
     const char* config_path = Aguilar_FormatCacheSettingsPath(arena);
     if (config_path == NULL) {
@@ -285,7 +303,7 @@ static int Aguilar_WriteCacheSettings(arena_t *arena, const char* file, u64 mod_
     return 0;
 }
 
-static int Aguilar_ReadCacheSettings(arena_t *arena, char** file, u64* mod_time, size_t string_max)
+internal int Aguilar_ReadCacheSettings(arena_t *arena, char** file, u64* mod_time, size_t string_max)
 {
     const char* config_path = Aguilar_FormatCacheSettingsPath(arena);
     if (config_path == NULL) {
@@ -327,7 +345,7 @@ static int Aguilar_ReadCacheSettings(arena_t *arena, char** file, u64* mod_time,
     return 0;
 }
 
-static int Aguilar_Run(arena_t *arena, char* file, char* arg)
+internal int Aguilar_Run(arena_t *arena, char* file, char* arg)
 {
     struct stat sb;
     if (!Aguilar_FileExists(file, &sb)) {
@@ -363,7 +381,7 @@ static int Aguilar_Run(arena_t *arena, char* file, char* arg)
     return 1;
 }
 
-static int Aguilar_WriteBasicMainFile(const char* path)
+internal int Aguilar_WriteBasicMainFile(const char* path)
 {
     FILE *file = fopen(path, "w");
 
@@ -381,7 +399,7 @@ static int Aguilar_WriteBasicMainFile(const char* path)
     return 1;
 }
 
-static int Aguilar_Install(arena_t *arena)
+internal int Aguilar_Install(arena_t *arena)
 {
     char cwd[128] = { 0 };
     getcwd(cwd, 128);
@@ -427,7 +445,7 @@ static int Aguilar_Install(arena_t *arena)
     return 1;
 }
 
-static void Aguilar_Help()
+internal void Aguilar_Help()
 {
     printf("Aguilar is a single command-line application that makes using C as a scripting language a lot easier.\n");
     printf("Aguilar is not itself a C compiler, and instead calls either the GNU or LLVM compilers.\n");
@@ -438,20 +456,21 @@ static void Aguilar_Help()
     printf("\n");
     printf("    - new [name]: Create a new project based on a predefined template.\n");
     printf("    - build (file): Build either a file or a project based on whether it can find a config file.\n");
+    printf("    - sync: Update an existing repository with any changes made to template files.\n");
     printf("    - run [file]: Build a single file (application is stored in a cache) and run it.\n");
     printf("    - install: Install the application in the user's bin folder.\n");
     printf("    - help: Print everything you need to know.\n");
     printf("    - zen: Print a zen of code.\n");
 }
 
-static void Aguilar_Zen()
+internal void Aguilar_Zen()
 {
     printf("The rules of zen:\n");
     printf("    1. Build your code with a reader in mind.\n");
     printf("    2. A compiler failure is better than a runtime error.\n");
 }
 
-static char* Aguilar_MergeArgs(arena_t *arena, char** args, int merge_offset, int merge_num)
+internal char* Aguilar_MergeArgs(arena_t *arena, char** args, int merge_offset, int merge_num)
 {
     size_t merge_size = 0;
 
@@ -496,6 +515,11 @@ int main(int argc, char** argv)
         case 'b': {
             if (Aguilar_Build(&arena) < 0) {
                 printf("Failed to build: %s\n", Aguilar_GetError());
+            }
+        } break;
+        case 's': {
+            if (Aguilar_SyncProject(&arena) < 0) {
+                printf("Failed to sync: %s\n", Aguilar_GetError());
             }
         } break;
         case 'r': {

@@ -7,6 +7,7 @@ Commands:
 
     - new [name]: Create a new project based on a predefined template.
     - build (file): Build either a file or a project based on whether it can find a config file.
+    - sync: Update an existing repository with any changes made to template files.   
     - run [file]: Build a single file (application is stored in a cache) and run it.
     - install: Install the application in the user's bin folder.
     - help: Print everything you need to know.
