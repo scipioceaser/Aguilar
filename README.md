@@ -1,7 +1,7 @@
 # Aguilar
 
 
-Aguilar is a single command-line application that makes using C as a scripting language a lot easier. Aguilar is not itself a C compiler, and instead calls either the GNU or LLVM compilers. It only works on Linux (Mac OS and WSL untested) at the moment.
+Aguilar is a single command-line application that makes using C as a scripting language a lot easier. Aguilar is not itself a C compiler, and instead calls either the GNU or LLVM C compiler. It only works on Linux (Mac OS and WSL untested) at the moment.
 
 Commands:
 
