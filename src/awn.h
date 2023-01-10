@@ -36,8 +36,20 @@ typedef double f64;
 
 #endif
 
+
+////////////////////////////////////////////////////////////////////////////////
+// NOTE(Alex): Struct define
+
+#define NEED_STRUCT(name)\
+typedef struct _##name name
+
+#define STRUCT(name)\
+typedef struct _##name name;\
+struct _##name
+
 ////////////////////////////////////////////////////////////////////////////////
 // NOTE(Alex): Array functions
+
 #define AWN_ArrayCount(array) (sizeof(array) / sizeof(*(array)))
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -46,10 +58,12 @@ typedef double f64;
 #include <assert.h>
 
 #define assertln(c, m) assert(c && m)
+#define todo TODO!!!
 #define todoln() assert(0 && "This code is yet to be completed.")
 
 ////////////////////////////////////////////////////////////////////////////////
 // NOTE(Alex): List functions
+
 #define AWN_SLLPushBack(f, l, n) ( ((f) == (0)) ? ((f) = (l) = (n), (n)->next = 0) : ((l)->next = (n), (l) = (n), (n)->next = 0) )
 #define AWN_SLLPushFront(f, l, n) ( ((f) == (0)) ? ((f) = (l) = (n), (n)->next = 0) : ((n)->next = (f), (f) = (n)) ) 
 #define AWN_SLLPop(f, l) ( ((f) == (l)) ? ((f) = (l) = (l)) : ((f) = (f)->next) )

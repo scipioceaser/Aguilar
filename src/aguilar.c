@@ -14,7 +14,6 @@
 
 // TODO(Alex): Define standard paths inside platform-specific macros.
 // TODO(Alex): Code documentation.
-// TODO(Alex): Structs for function arguments + cleaner handling of command line arguments.
 
 // WARNING(Alex): This only works on Linux (Maybe MacOS?).
 
@@ -30,6 +29,17 @@
 #include <dirent.h>
 
 #define AGUILAR_VERSION "0.1"
+
+#if defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__) || defined(__MINGW32__)
+#error Windows not yet supported!
+#elif defined(__APPLE__)
+#error Mac OS not supported!
+#elif (defined(linux) || defined(__linux) || defined(__linux__))
+
+    #define CACHE_OUT_PATH "~/.cache/aguilar_program.out"
+    #define CACHE_CONFIG_PATH "/.cache/aguilar_program.cache"
+
+#endif
 
 internal bool Aguilar_FileExists(const char* file, struct stat *sb)
 {
@@ -258,9 +268,6 @@ internal int Aguilar_Build(arena_t *arena)
 
     return 1;
 }
-
-#define CACHE_OUT_PATH "~/.cache/aguilar_program.out"
-#define CACHE_CONFIG_PATH "/.cache/aguilar_program.cache"
 
 internal char* Aguilar_FormatCacheSettingsPath(arena_t *arena)
 {
