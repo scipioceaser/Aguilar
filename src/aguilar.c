@@ -12,8 +12,8 @@
         - zen: Print a zen of code.
 */
 
-// TODO(Alex): Define standard paths inside platform-specific macros.
 // TODO(Alex): Code documentation.
+// TODO(Alex): Some way (per-project) of tracking the libraries we need to link -> Read from hidden text file?
 
 // WARNING(Alex): This only works on Linux (Maybe MacOS?).
 
@@ -117,9 +117,9 @@ internal int Aguilar_NewProject(arena_t *arena, char* name)
         return -1;
     }
 
-    char* main_path = AWN_ArenaPush(arena, sizeof(char) * (strlen(name) * 2 + strlen("/src/") + 2));
+    char* main_path = AWN_ArenaPush(arena, sizeof(char) * (strlen(name) * 2 + strlen("/src/") + 64));
 
-    sprintf(main_path, "%s/src/%s.c", name, name);
+    sprintf(main_path, "%s/src/%s_main.c", name, name);
 
     char* command = AWN_ArenaPush(arena, sizeof(char) * (strlen(main_path) + 128));
 
@@ -163,6 +163,123 @@ internal int Aguilar_SyncProject(arena_t* arena)
 #define CALL_GCC "gcc"
 #define CALL_CLANG "clang"
 #define ARG_OUTPUT "-o"
+
+#define DEFAULT_FLAGS "-Wall -g -O3"
+
+internal char* Aguilar_ParseConfigArgs(arena_t *arena, char* line, size_t line_length, int divide_point, char* prefix)
+{
+    const size_t list_length = 256;
+    char* result = AWN_ArenaPush(arena, sizeof(char) * list_length);
+
+    int current = divide_point;
+
+    char value_str[128];
+    int value_idx = 0;
+    while (current <= line_length) {
+        if (line[current] == ' ' or line[current] == '\n') {
+            current++;
+            continue;
+        }
+
+        if (line[current] == ';') {
+            strncat(result, prefix, 256 - strlen(prefix) - 1);
+            strncat(result, value_str, 256 - strlen(value_str) - 1);
+
+            memset(value_str, 0, 128);
+            value_idx = 0;
+
+            current++;
+            continue;
+        }
+
+        value_str[value_idx++] = line[current];
+
+        current++;
+    }
+
+    if (value_idx != 0) {
+        strncat(result, prefix, 256 - strlen(prefix) - 1);
+        strncat(result, value_str, 256 - strlen(value_str) - 1);
+    }
+
+    return result;
+}
+
+internal char* Aguilar_ReadProjectFile(arena_t *arena)
+{
+
+#define CHECK_END(c) (c) != '\n'\
+    and (c) != '\r'\
+    and (c) != '\0'\
+    and (c) != EOF
+
+    if (!Aguilar_FileExists(".aguilar", 0)) {
+        return 0;
+    }
+
+    FILE* project_file = fopen(".aguilar", "r");
+
+    if (project_file == 0) {
+        Aguilar_SetError("Failed to open .aguilar file!");
+        return 0;
+    }
+
+    const int size_max = 1024;
+    char line[size_max];
+
+    char *args_result = AWN_ArenaPush(arena, sizeof(char) * 2048);
+
+    bool found_flags = false;
+
+    while (fgets(line, size_max, project_file) != NULL) {
+        int divide_point = 0;
+
+        while (CHECK_END(line[divide_point])) {
+            if (line[divide_point] == ':') {
+                divide_point++;
+                break;
+            }
+
+            divide_point++;
+        }
+
+        const int line_length = strlen(line);
+
+        if (divide_point == line_length) {
+            // NOTE(Alex): Throw parsing error
+            Aguilar_SetError("Parsing Error: Did not find dividing colon!");
+            return 0;
+        }
+
+        // NOTE(Alex): Right hand side is a semicolon separated list.
+        switch (line[0]) {
+            case 'l': {
+                /* // NOTE(Alex): Parse libraries */
+                char* parse = Aguilar_ParseConfigArgs(arena, line, line_length, divide_point, " -l");
+                strncat(args_result, parse, 2048 - strlen(parse) - 1);
+            } break;
+
+            case 'a': {
+                // NOTE(Alex): Parse args
+                char* parse = Aguilar_ParseConfigArgs(arena, line, line_length, divide_point, " ");
+                strncat(args_result, parse, 2048 - strlen(parse) - 1);
+                found_flags = true;
+            } break;
+        }
+    }
+
+    // NOTE(Alex): Append defaults
+    if (!found_flags) {
+        strncat(args_result, " ", 2);
+        strncat(args_result, DEFAULT_FLAGS, 2048 - strlen(DEFAULT_FLAGS) - 1);
+    }
+
+    fclose(project_file);
+
+#undef CHECK_END
+
+    return args_result;
+}
 
 internal int Aguilar_RunBuildInstruction(arena_t *arena, char* source, char* args, char* output)
 {
@@ -260,7 +377,12 @@ internal int Aguilar_Build(arena_t *arena)
     memcpy(out, (cwd + offset), (strlen(cwd) - offset) );
     out[strlen(cwd) - offset] = '\0';
 
-    Aguilar_RunBuildInstruction(arena, path, 0, out);
+    char* args = Aguilar_ReadProjectFile(arena);
+    if (args != 0) {
+        Aguilar_RunBuildInstruction(arena, path, args, out);
+    } else {
+        Aguilar_RunBuildInstruction(arena, path, 0, out);
+    }
 
     closedir(src_dir);
 
@@ -508,7 +630,7 @@ int main(int argc, char** argv)
     }
 
     arena_t arena;
-    AWN_ArenaCreate(&arena, malloc(KB(128)), KB(128));
+    AWN_ArenaCreate(&arena, malloc(KB(8)), KB(8));
 
     switch (argv[1][0])
     {
