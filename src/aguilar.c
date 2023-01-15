@@ -13,7 +13,6 @@
 */
 
 // TODO(Alex): Code documentation.
-// TODO(Alex): Some way (per-project) of tracking the libraries we need to link -> Read from hidden text file?
 
 // WARNING(Alex): This only works on Linux (Maybe MacOS?).
 
@@ -166,7 +165,7 @@ internal int Aguilar_SyncProject(arena_t* arena)
 
 #define DEFAULT_FLAGS "-Wall -g -O3"
 
-internal char* Aguilar_ParseConfigArgs(arena_t *arena, char* line, size_t line_length, int divide_point, char* prefix)
+internal char* Aguilar_ParseConfigLine(arena_t *arena, char* line, size_t line_length, int divide_point, char* prefix)
 {
     const size_t list_length = 256;
     char* result = AWN_ArenaPush(arena, sizeof(char) * list_length);
@@ -255,13 +254,13 @@ internal char* Aguilar_ReadProjectFile(arena_t *arena)
         switch (line[0]) {
             case 'l': {
                 /* // NOTE(Alex): Parse libraries */
-                char* parse = Aguilar_ParseConfigArgs(arena, line, line_length, divide_point, " -l");
+                char* parse = Aguilar_ParseConfigLine(arena, line, line_length, divide_point, " -l");
                 strncat(args_result, parse, 2048 - strlen(parse) - 1);
             } break;
 
-            case 'a': {
-                // NOTE(Alex): Parse args
-                char* parse = Aguilar_ParseConfigArgs(arena, line, line_length, divide_point, " ");
+            case 'f': {
+                // NOTE(Alex): Parse flags
+                char* parse = Aguilar_ParseConfigLine(arena, line, line_length, divide_point, " ");
                 strncat(args_result, parse, 2048 - strlen(parse) - 1);
                 found_flags = true;
             } break;
