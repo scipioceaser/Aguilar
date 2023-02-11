@@ -40,7 +40,7 @@
 
 #endif
 
-internal bool Aguilar_FileExists(const char* file, struct stat *sb)
+function bool Aguilar_FileExists(const char* file, struct stat *sb)
 {
     struct stat *ptr;
     struct stat tmp;
@@ -61,21 +61,21 @@ internal bool Aguilar_FileExists(const char* file, struct stat *sb)
 #define ERROR_STR_LEN 1024
 char __error[ERROR_STR_LEN] = { 0 };
 
-internal void Aguilar_SetError(char* error)
+function void Aguilar_SetError(char* error)
 {
     if (strlen(error) < ERROR_STR_LEN) {
         memcpy(__error, error, strlen(error));
     }
 }
 
-internal char* Aguilar_GetError()
+function char* Aguilar_GetError()
 {
     return __error;
 }
 
 #define ENV_COMPILER "AGUILAR_COMPILER"
 
-internal char* Aguilar_GetCompilerEnv()
+function char* Aguilar_GetCompilerEnv()
 {
     if (getenv(ENV_COMPILER) != NULL) {
         const char* env = getenv(ENV_COMPILER);
@@ -92,7 +92,7 @@ internal char* Aguilar_GetCompilerEnv()
     return "gcc";
 }
 
-internal int Aguilar_NewProject(arena_t *arena, char* name)
+function int Aguilar_NewProject(arena_t *arena, char* name)
 {
     if (Aguilar_FileExists(name, 0)) {
         Aguilar_SetError("Directory already exists!");
@@ -142,7 +142,7 @@ internal int Aguilar_NewProject(arena_t *arena, char* name)
     return 1;
 }
 
-internal int Aguilar_SyncProject(arena_t* arena)
+function int Aguilar_SyncProject(arena_t* arena)
 {
     if (!Aguilar_FileExists("src", 0)) {
         Aguilar_SetError("Not inside project directory!");
@@ -165,7 +165,7 @@ internal int Aguilar_SyncProject(arena_t* arena)
 
 #define DEFAULT_FLAGS "-Wall -g -O3"
 
-internal char* Aguilar_ParseConfigLine(arena_t *arena, char* line, size_t line_length, int divide_point, char* prefix)
+function char* Aguilar_ParseConfigLine(arena_t *arena, char* line, size_t line_length, int divide_point, char* prefix)
 {
     const size_t list_length = 256;
     char* result = AWN_ArenaPush(arena, sizeof(char) * list_length);
@@ -204,7 +204,7 @@ internal char* Aguilar_ParseConfigLine(arena_t *arena, char* line, size_t line_l
     return result;
 }
 
-internal char* Aguilar_ReadProjectFile(arena_t *arena)
+function char* Aguilar_ReadProjectFile(arena_t *arena)
 {
 
 #define CHECK_END(c) (c) != '\n'\
@@ -280,7 +280,7 @@ internal char* Aguilar_ReadProjectFile(arena_t *arena)
     return args_result;
 }
 
-internal int Aguilar_RunBuildInstruction(arena_t *arena, char* source, char* args, char* output)
+function int Aguilar_RunBuildInstruction(arena_t *arena, char* source, char* args, char* output)
 {
     const char* compiler = Aguilar_GetCompilerEnv();
 
@@ -310,7 +310,7 @@ internal int Aguilar_RunBuildInstruction(arena_t *arena, char* source, char* arg
     return res;
 }
 
-internal int Aguilar_Build(arena_t *arena)
+function int Aguilar_Build(arena_t *arena)
 {
     if (Aguilar_FileExists("build.sh", 0)) {
         system("./build.sh");
@@ -390,7 +390,7 @@ internal int Aguilar_Build(arena_t *arena)
     return 1;
 }
 
-internal char* Aguilar_FormatCacheSettingsPath(arena_t *arena)
+function char* Aguilar_FormatCacheSettingsPath(arena_t *arena)
 {
     const char* home = getenv("HOME");
     if (home == NULL) {
@@ -404,7 +404,7 @@ internal char* Aguilar_FormatCacheSettingsPath(arena_t *arena)
     return config_path;
 }
 
-internal int Aguilar_WriteCacheSettings(arena_t *arena, const char* file, u64 mod_time)
+function int Aguilar_WriteCacheSettings(arena_t *arena, const char* file, u64 mod_time)
 {
     const char* config_path = Aguilar_FormatCacheSettingsPath(arena);
     if (config_path == NULL) {
@@ -431,7 +431,7 @@ internal int Aguilar_WriteCacheSettings(arena_t *arena, const char* file, u64 mo
     return 0;
 }
 
-internal int Aguilar_ReadCacheSettings(arena_t *arena, char** file, u64* mod_time, size_t string_max)
+function int Aguilar_ReadCacheSettings(arena_t *arena, char** file, u64* mod_time, size_t string_max)
 {
     const char* config_path = Aguilar_FormatCacheSettingsPath(arena);
     if (config_path == NULL) {
@@ -473,7 +473,7 @@ internal int Aguilar_ReadCacheSettings(arena_t *arena, char** file, u64* mod_tim
     return 0;
 }
 
-internal int Aguilar_Run(arena_t *arena, char* file, char* arg)
+function int Aguilar_Run(arena_t *arena, char* file, char* arg)
 {
     struct stat sb;
     if (!Aguilar_FileExists(file, &sb)) {
@@ -509,7 +509,7 @@ internal int Aguilar_Run(arena_t *arena, char* file, char* arg)
     return 1;
 }
 
-internal int Aguilar_WriteBasicMainFile(const char* path)
+function int Aguilar_WriteBasicMainFile(const char* path)
 {
     FILE *file = fopen(path, "w");
 
@@ -527,7 +527,7 @@ internal int Aguilar_WriteBasicMainFile(const char* path)
     return 1;
 }
 
-internal int Aguilar_Install(arena_t *arena)
+function int Aguilar_Install(arena_t *arena)
 {
     char cwd[128] = { 0 };
     getcwd(cwd, 128);
@@ -573,7 +573,7 @@ internal int Aguilar_Install(arena_t *arena)
     return 1;
 }
 
-internal void Aguilar_Help()
+function void Aguilar_Help()
 {
     printf("Aguilar is a single command-line application that makes using C as a scripting language a lot easier.\n");
     printf("Aguilar is not itself a C compiler, and instead calls either the GNU or LLVM compilers.\n");
@@ -591,14 +591,14 @@ internal void Aguilar_Help()
     printf("    - zen: Print a zen of code.\n");
 }
 
-internal void Aguilar_Zen()
+function void Aguilar_Zen()
 {
     printf("The rules of zen:\n");
     printf("    1. Build your code with a reader in mind.\n");
     printf("    2. A compiler failure is better than a runtime error.\n");
 }
 
-internal char* Aguilar_MergeArgs(arena_t *arena, char** args, int merge_offset, int merge_num)
+function char* Aguilar_MergeArgs(arena_t *arena, char** args, int merge_offset, int merge_num)
 {
     size_t merge_size = 0;
 
@@ -628,8 +628,7 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    arena_t arena;
-    AWN_ArenaCreate(&arena, malloc(KB(8)), KB(8));
+    arena_t arena = AWN_ArenaCreate(KB(8));
 
     switch (argv[1][0])
     {
@@ -670,5 +669,5 @@ int main(int argc, char** argv)
         default: case 'h': Aguilar_Help();
     }
 
-    free(arena.buffer);
+    AWN_ArenaFree(arena);
 }

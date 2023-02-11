@@ -4,8 +4,9 @@
 ////////////////////////////////////////////////////////////////////////////////
 // NOTE(Alex): Types
 #include <stdint.h>
+#include <stddef.h>
 
-#define internal static
+#define function static
 #define global static
 #define local_persist static
 
@@ -19,6 +20,8 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64; 
 
+typedef size_t usize;
+
 typedef float f32;
 typedef double f64;
 
@@ -29,13 +32,11 @@ typedef double f64;
 
     #define and &&
     #define or ||
-    #define true (0 == 0)
-    #define false (0 == 1)
+    #define not !
 
-    typedef i32 bool;
+#include <stdbool.h>
 
 #endif
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // NOTE(Alex): Struct define
@@ -46,6 +47,32 @@ typedef struct _##name name
 #define STRUCT(name)\
 typedef struct _##name name;\
 struct _##name
+
+#define NEED_UNION(name)\
+typedef union _##name name
+
+#define UNION(name)\
+typedef union _##name name;\
+union _##name
+
+#define NEED_ENUM(name)\
+typedef enum _##name name
+
+#define ENUM(name)\
+typedef enum _##name name;\
+enum _##name
+
+////////////////////////////////////////////////////////////////////////////////
+// NOTE(Alex): Macros that make grepping easier.
+
+#define cast(type, var) ((type))(var)
+#define max(a, b) ((a) > (b) ? (a) : (b))
+#define min(a, b) ((a) < (b) ? (a) : (b))
+
+#define clamp(mi, mx, c) (max(min((c), mi), mx))
+#define clamp01(a) clamp(0, 1, a)
+
+#define lerp(a, b, t) ((1 - (t)) * (a) + (t) * (b))
 
 ////////////////////////////////////////////////////////////////////////////////
 // NOTE(Alex): Array functions
@@ -62,10 +89,67 @@ struct _##name
 #define todoln() assert(0 && "This code is yet to be completed.")
 
 ////////////////////////////////////////////////////////////////////////////////
+// NOTE(Alex): Rust and C++ style optionals
+
+#define Option(type) opt_##type
+#define DefineOptional(type) typedef struct { bool present; type value; } Option(type)
+#define DefineNamedOptional(type, name) \
+        typedef type name; \
+        DefineOptional(name)
+#define Some(type, val) ( \
+        (Option(type)) { \
+            .present = true, \
+            .value = val, \
+        } \
+)
+#define None(type) ( \
+    (Option(type)) { \
+        .present = false, \
+        .value = 0, \
+    } \
+)
+#define IsSome(option) (option.present)
+#define IsNone(option) (!IsSome(option))
+#define Unwrap(option, val) ( \
+    (IsSome(option) ? (val = option.value, true) : (false)) \
+)
+#define AssertUnwrap(option, val) \
+        if (IsNone(option)) { \
+            val = 0; \
+            assertln(false, "Failed to unwrap"); \
+        } else { \
+            Unwrap(option, val); \
+        }
+
+// These are all the optionals for standard types.
+DefineOptional(int);
+DefineOptional(float);
+DefineOptional(char);
+DefineOptional(bool);
+
+DefineOptional(i8);
+DefineOptional(i16);
+DefineOptional(i32);
+DefineOptional(i64); 
+
+DefineOptional(u8);
+DefineOptional(u16);
+DefineOptional(u32);
+DefineOptional(u64); 
+DefineOptional(usize);
+
+DefineOptional(f32);
+DefineOptional(f64);
+
+////////////////////////////////////////////////////////////////////////////////
 // NOTE(Alex): List functions
 
-#define AWN_SLLPushBack(f, l, n) ( ((f) == (0)) ? ((f) = (l) = (n), (n)->next = 0) : ((l)->next = (n), (l) = (n), (n)->next = 0) )
-#define AWN_SLLPushFront(f, l, n) ( ((f) == (0)) ? ((f) = (l) = (n), (n)->next = 0) : ((n)->next = (f), (f) = (n)) ) 
+#define AWN_SLLPushBack(f, l, n) ( ((f) == (0)) ? ((f) = (l) = (n),\
+            (n)->next = 0) : ((l)->next = (n),\
+            (l) = (n), (n)->next = 0) )
+#define AWN_SLLPushFront(f, l, n) ( ((f) == (0)) ? ((f) = (l) = (n),\
+            (n)->next = 0) : ((n)->next = (f),\
+            (f) = (n)) ) 
 #define AWN_SLLPop(f, l) ( ((f) == (l)) ? ((f) = (l) = (l)) : ((f) = (f)->next) )
 #define AWN_SLLIter(type, list) for (type *node = list.first; node != 0; node = node->next)
 
@@ -142,30 +226,43 @@ struct _##name
 #include <string.h>
 
 ///////////////////////////////////////////////////////////////////////////////
-// NOTE(Alex): Arena type
-typedef struct arena_t
+// NOTE(Alex): Arena type (https://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-002)
+// TODO(Alex): Should Arena work with Optionals?
+
+STRUCT(arena_t)
 {
     u8 *buffer;
-    u64 pos;
-    u64 pos_prev;
-    u64 cap;
-} arena_t;
+    usize pos;
+    usize pos_prev;
+    usize cap;
+    bool auto_grow;
+};
 
-void AWN_ArenaCreate(arena_t *arena, void* mem_buffer, u64 mem_size);
-void* AWN_ArenaPush(arena_t *arena, u64 push_size);
-void* AWN_ArenaResize(arena_t *arena, void* old_memory, u64 old_size, u64 new_size);
+#define AWN_ARENA_AUTOGROW_ENABLED 1
+
+DefineOptional(arena_t);
+
+arena_t AWN_ArenaCreateFromBuffer(void* mem_buffer, usize mem_size);
+arena_t AWN_ArenaCreate(usize mem_size);
+arena_t AWN_ArenaCreateEmpty();
+void* AWN_ArenaPush(arena_t *arena, usize push_size);
+void* AWN_ArenaResize(arena_t *arena, void* old_memory, usize old_size, usize new_size);
 void AWN_ArenaClear(arena_t *arena);
-void AWN_ArenaGrow(arena_t *arena, void* new_buffer, u64 new_size);
-void AWN_ArenaShrink(arena_t *arena, void* new_buffer, u64 new_size);
+void AWN_ArenaGrow(arena_t *arena, usize new_size);
+void AWN_ArenaGrowFromBuffer(arena_t *arena, void* new_buffer, usize new_size);
+void AWN_ArenaShrink(arena_t *arena, usize new_size);
+void AWN_ArenaShrinkFromBuffer(arena_t *arena, void* new_buffer, usize new_size);
 
 // NOTE(Alex): This is the system for recording arena states (for temporary allocations).
 //              Allows us to use the linear allocator like a stack allocator.
-typedef struct arena_state_t
+STRUCT(arena_state_t)
 {
     arena_t *arena;
-    u64 pos_prev;
-    u64 pos_cur;
-} arena_state_t;
+    usize pos_prev;
+    usize pos_cur;
+};
+
+DefineOptional(arena_state_t);
 
 arena_state_t AWN_ArenaStateRecord(arena_t *a);
 void AWN_ArenaStateRestore(arena_state_t);
@@ -177,26 +274,59 @@ void AWN_ArenaStateRestore(arena_state_t);
 ///////////////////////////////////////////////////////////////////////////////
 // NOTE(Alex): Arena allocator implementation
 
-void AWN_ArenaCreate(arena_t *arena, void* mem_buffer, u64 mem_size)
-{
-    arena->buffer = (u8 *)mem_buffer;
-    arena->cap = mem_size;
+#include <stdlib.h>
 
-    arena->pos = 0;
-    arena->pos_prev = 0;
+arena_t AWN_ArenaCreateFromBuffer(void* mem_buffer, usize mem_size)
+{
+    arena_t arena;
+    arena.buffer = (u8 *)mem_buffer;
+    arena.cap = mem_size;
+
+    arena.pos = 0;
+    arena.pos_prev = 0;
+#ifdef AWN_ARENA_AUTOGROW_ENABLED
+    arena.auto_grow = true;
+#else
+    arena.auto_grow = false;
+#endif
+    return arena;
 }
 
-void* AWN_ArenaPush(arena_t *arena, u64 push_size)
+arena_t AWN_ArenaCreate(usize mem_size)
 {
+    void* buffer = malloc(mem_size);
+    assertln(buffer != NULL, "Arena: Failed to allocate memory.");
+    return AWN_ArenaCreateFromBuffer(malloc(mem_size), mem_size);
+}
+
+arena_t AWN_ArenaCreateEmpty()
+{
+    return AWN_ArenaCreate(2);
+}
+
+// NOTE(Alex): We would prefer it if the user never manually frees an arena buffer.
+void AWN_ArenaFree(arena_t arena)
+{
+    if (arena.buffer != NULL) {
+        free(arena.buffer);
+    }
+}
+
+void* AWN_ArenaPush(arena_t *arena, usize push_size)
+{
+    assertln(arena != NULL and arena->buffer != NULL, "Arena points to null.");
     assertln(push_size > 0, "Arena push: Push size is zero.");
     void *result = 0;
 
-    u64 cur_ptr = (u64)arena->buffer + arena->pos;
-    u64 offset = AWN_ARENA_ALIGN_UP_POW_2(cur_ptr, AWN_ARENA_DEFAULT_ALIGNMENT);
-    offset -= (u64)arena->buffer;
+    usize cur_ptr = (usize)arena->buffer + arena->pos;
+    usize offset = AWN_ARENA_ALIGN_UP_POW_2(cur_ptr, AWN_ARENA_DEFAULT_ALIGNMENT);
+    offset -= (usize)arena->buffer;
 
-    if (offset + push_size <= arena->cap)
-    {
+    if (offset + push_size > arena->cap and arena->auto_grow) {
+        AWN_ArenaGrow(arena, offset + push_size);
+    }
+
+    if (offset + push_size <= arena->cap) {
         result = &arena->buffer[offset];
         arena->pos_prev = arena->pos;
         arena->pos = offset + push_size;
@@ -207,38 +337,33 @@ void* AWN_ArenaPush(arena_t *arena, u64 push_size)
     return result;
 }
 
-void* AWN_ArenaResize(arena_t *arena, void* old_memory, u64 old_size, u64 new_size)
+void* AWN_ArenaResize(arena_t *arena, void* old_memory, usize old_size, usize new_size)
 {
+    assertln(arena != NULL and arena->buffer != NULL, "Arena points to null.");
     u8* old_mem = (u8 *)old_memory;
     void* result = 0;
 
     // NOTE(Alex): If neither of these is true, memory is out of bounds.
-    if (old_mem == 0 || old_size == 0)
-    {
+    if (old_mem == 0 || old_size == 0) {
         return AWN_ArenaPush(arena, new_size);
-    }
-    // NOTE(Alex): This checks whether the old memory could actually be inside the arena's buffer.
-    else if (arena->buffer <= old_mem && old_mem < arena->buffer + arena->cap)
-    {
+    } else if (arena->buffer <= old_mem && old_mem < arena->buffer + arena->cap) {
+        // NOTE(Alex): This checks whether the old memory could actually be inside the arena's buffer.
+        //
         // NOTE(Alex): Checks if the old memory was our last allocation.
-        if (arena->buffer + arena->pos_prev == old_mem)
-        {
+        if (arena->buffer + arena->pos_prev == old_mem) {
             arena->pos = arena->pos_prev + new_size;
             // NOTE(Alex): If we're making the allocation larger, make sure we reset the data to zero.
-            if (new_size > old_size)
-            {
+            if (new_size > old_size) {
                 memset(&arena->buffer[arena->pos], 0, new_size - old_size);
             }
             result = old_memory;
-        }
-        else
-        {
+        } else {
             // NOTE(Alex): Because pos_prev does not align, that means that this was an even earlier allocation.
             //              Therefore we will just allocate new memory and copy old data in new buffer.
             //              This does mean that we lost the buffer we had already allocated, but that is just
             //              how arena allocators work.
             void *new_memory = AWN_ArenaPush(arena, new_size);
-            u64 copy_size = old_size < new_size ? old_size : new_size;
+            usize copy_size = old_size < new_size ? old_size : new_size;
             memcpy(new_memory, old_memory, copy_size);
             result = new_memory;
         }
@@ -250,14 +375,27 @@ void* AWN_ArenaResize(arena_t *arena, void* old_memory, u64 old_size, u64 new_si
 
 void AWN_ArenaClear(arena_t *arena)
 {
+    assertln(arena != NULL and arena->buffer != NULL, "Arena points to null.");
     arena->pos = 0;
     arena->pos_prev = 0;
 }
 
-void AWN_ArenaGrow(arena_t *arena, void* new_buffer, u64 new_size)
+void AWN_ArenaGrow(arena_t *arena, usize new_size)
 {
-    if (new_size < arena->cap)
-    {
+    assertln(arena != NULL and arena->buffer != NULL, "Arena points to null.");
+    if (new_size < arena->cap) {
+        return;
+    }
+
+    void* new_buffer = realloc(arena->buffer, new_size);
+    assertln(new_buffer != NULL, "Arena: Failed to reallocate memory for the arena.");
+    AWN_ArenaGrowFromBuffer(arena, new_buffer, new_size);
+}
+
+void AWN_ArenaGrowFromBuffer(arena_t *arena, void* new_buffer, usize new_size)
+{
+    assertln(arena != NULL and arena->buffer != NULL, "Arena points to null.");
+    if (new_size < arena->cap) {
         return;
     }
 
@@ -268,10 +406,22 @@ void AWN_ArenaGrow(arena_t *arena, void* new_buffer, u64 new_size)
     arena->cap = new_size;
 }
 
-void AWN_ArenaShrink(arena_t *arena, void* new_buffer, u64 new_size)
+void AWN_ArenaShrink(arena_t *arena, usize new_size)
 {
-    if (new_size < arena->pos)
-    {
+    assertln(arena != NULL and arena->buffer != NULL, "Arena points to null.");
+    if (new_size < arena->pos) {
+        new_size = arena->pos;
+    }
+
+    void* new_buffer = realloc(arena->buffer, new_size);
+    assertln(new_buffer != NULL, "Arena: Failed to reallocate memory for the arena.");
+    AWN_ArenaShrinkFromBuffer(arena, new_buffer, new_size);
+}
+
+void AWN_ArenaShrinkFromBuffer(arena_t *arena, void* new_buffer, usize new_size)
+{
+    assertln(arena != NULL and arena->buffer != NULL, "Arena points to null.");
+    if (new_size < arena->pos) {
         new_size = arena->pos;
     }
 
@@ -284,6 +434,7 @@ void AWN_ArenaShrink(arena_t *arena, void* new_buffer, u64 new_size)
 
 arena_state_t AWN_ArenaStateRecord(arena_t *arena)
 {
+    assertln(arena != NULL, "Arena points to null.");
     arena_state_t state;
     state.arena = arena;
     state.pos_prev = arena->pos_prev;
